@@ -132,4 +132,164 @@ export class TokenPurchaseService {
 
     return tokenPurchase.save();
   }
+
+  /**
+   * Fulfill all pending token purchases for a specific wallet address
+   * @param walletAddress Ethereum wallet address
+   * @param txHash Transaction hash from the blockchain
+   * @returns Array of updated token purchases
+   */
+  async fulfillTokenPurchaseByWalletAddress(
+    walletAddress: string,
+    txHash: string,
+  ): Promise<TokenPurchaseDocument[]> {
+    this.logger.log(
+      `Fulfilling all pending token purchases for wallet: ${walletAddress}`,
+    );
+
+    // Find all pending token purchases for the wallet address
+    const pendingPurchases = await this.tokenPurchaseModel
+      .find({ walletAddress, fulfilled: false })
+      .exec();
+
+    if (!pendingPurchases.length) {
+      this.logger.warn(
+        `No pending token purchases found for wallet: ${walletAddress}`,
+      );
+      return [];
+    }
+
+    // Update all pending purchases
+    const updatedPurchases = await Promise.all(
+      pendingPurchases.map(async (purchase) => {
+        purchase.fulfilled = true;
+        purchase.txHash = txHash;
+        return purchase.save();
+      }),
+    );
+
+    this.logger.log(
+      `Successfully fulfilled ${updatedPurchases.length} token purchases for wallet: ${walletAddress}`,
+    );
+    return updatedPurchases;
+  }
+
+  /**
+   * Fulfill multiple token purchases by their IDs
+   * @param ids Array of token purchase IDs
+   * @param txHash Transaction hash from the blockchain
+   * @returns Array of updated token purchases
+   */
+  async fulfillTokenPurchasesByIds(
+    ids: string[],
+    txHash: string,
+  ): Promise<TokenPurchaseDocument[]> {
+    this.logger.log(`Fulfilling token purchases with IDs: ${ids.join(', ')}`);
+
+    // Validate all IDs exist before updating any
+    const purchases = await Promise.all(
+      ids.map(async (id) => {
+        try {
+          return await this.getTokenPurchaseById(id);
+        } catch (error) {
+          // Type-safe error handling
+          if (error instanceof Error) {
+            this.logger.error(
+              `Error retrieving token purchase with ID: ${id}. ${error.message}`,
+            );
+          } else {
+            this.logger.error(
+              `Unknown error retrieving token purchase with ID: ${id}`,
+            );
+          }
+          throw error; // Re-throw to be caught by controller
+        }
+      }),
+    );
+
+    // Update all purchases
+    const updatedPurchases = await Promise.all(
+      purchases.map(async (purchase) => {
+        if (purchase.fulfilled) {
+          this.logger.warn(
+            `Token purchase ${String(purchase._id)} is already fulfilled. Skipping.`,
+          );
+          return purchase;
+        }
+
+        purchase.fulfilled = true;
+        purchase.txHash = txHash;
+        return purchase.save();
+      }),
+    );
+
+    this.logger.log(
+      `Successfully fulfilled ${updatedPurchases.length} token purchases`,
+    );
+    return updatedPurchases;
+  }
+
+  /**
+   * Fulfill all pending token purchases for multiple wallet addresses
+   * @param walletAddresses Array of Ethereum wallet addresses
+   * @param txHash Transaction hash from the blockchain
+   * @returns Array of updated token purchases
+   */
+  async fulfillTokenPurchasesByWalletAddresses(
+    walletAddresses: string[],
+    txHash: string,
+  ): Promise<TokenPurchaseDocument[]> {
+    this.logger.log(
+      `Fulfilling token purchases for wallet addresses: ${walletAddresses.join(
+        ', ',
+      )}`,
+    );
+
+    // Find all pending token purchases for the provided wallet addresses
+    const pendingPurchases = await this.tokenPurchaseModel
+      .find({
+        walletAddress: { $in: walletAddresses },
+        fulfilled: false,
+      })
+      .exec();
+
+    if (!pendingPurchases.length) {
+      this.logger.warn(
+        `No pending token purchases found for the provided wallet addresses`,
+      );
+      return [];
+    }
+
+    // Update all pending purchases
+    const updatedPurchases = await Promise.all(
+      pendingPurchases.map(async (purchase) => {
+        purchase.fulfilled = true;
+        purchase.txHash = txHash;
+        return purchase.save();
+      }),
+    );
+
+    // Group results by wallet address for logging
+    const walletCounts: Record<string, number> = updatedPurchases.reduce(
+      (acc: Record<string, number>, purchase) => {
+        const wallet = purchase.walletAddress;
+        acc[wallet] = (acc[wallet] || 0) + 1;
+        return acc;
+      },
+      {},
+    );
+
+    for (const [wallet, count] of Object.entries(walletCounts)) {
+      this.logger.log(
+        `Fulfilled ${count} purchases for wallet: ${String(wallet)}`,
+      );
+    }
+
+    this.logger.log(
+      `Successfully fulfilled ${updatedPurchases.length} token purchases across ${
+        Object.keys(walletCounts).length
+      } wallets`,
+    );
+    return updatedPurchases;
+  }
 }

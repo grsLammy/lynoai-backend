@@ -26,6 +26,12 @@ describe('TokenPurchaseController', () => {
     getTokenPurchasesByWalletAddress: jest.fn(),
     getFulfilledTokenPurchases: jest.fn(),
     getPendingTokenPurchases: jest.fn(),
+    getTokenPurchaseById: jest.fn(),
+    getAllTokenPurchases: jest.fn(),
+    fulfillTokenPurchase: jest.fn(),
+    fulfillTokenPurchaseByWalletAddress: jest.fn(),
+    fulfillTokenPurchasesByIds: jest.fn(),
+    fulfillTokenPurchasesByWalletAddresses: jest.fn(),
   };
 
   // Mock Logger to avoid console output during tests
@@ -260,6 +266,93 @@ describe('TokenPurchaseController', () => {
     });
   });
 
+  describe('getTokenPurchaseById', () => {
+    const id = '60d21b4667d0d8992e610c85';
+    const mockPurchase = {
+      _id: id,
+      walletAddress: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
+      amount: '1000000000000000000',
+      selectedPaymentToken: 'ETH',
+      paymentAmount: '0.5',
+      fulfilled: false,
+    };
+
+    it('should return a purchase by its ID', async () => {
+      mockTokenPurchaseService.getTokenPurchaseById.mockResolvedValue(
+        mockPurchase,
+      );
+
+      const result = await controller.getTokenPurchaseById(id);
+
+      expect(service.getTokenPurchaseById).toHaveBeenCalledWith(id);
+      expect(result).toEqual(mockPurchase);
+    });
+
+    it('should throw an HttpException when service throws an error', async () => {
+      const errorMessage = 'Purchase not found';
+      mockTokenPurchaseService.getTokenPurchaseById.mockRejectedValue(
+        new Error(errorMessage),
+      );
+
+      try {
+        await controller.getTokenPurchaseById(id);
+        fail('Expected HttpException to be thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(HttpException);
+        expect(error.message).toBe(errorMessage);
+        expect(error.getStatus()).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+    });
+  });
+
+  describe('getAllTokenPurchases', () => {
+    const mockPurchases = [
+      {
+        _id: '60d21b4667d0d8992e610c85',
+        walletAddress: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
+        amount: '1000000000000000000',
+        selectedPaymentToken: 'ETH',
+        paymentAmount: '0.5',
+        fulfilled: false,
+      },
+      {
+        _id: '60d21b4667d0d8992e610c86',
+        walletAddress: '0x123abc456def789',
+        amount: '2000000000000000000',
+        selectedPaymentToken: 'USDC',
+        paymentAmount: '100',
+        fulfilled: true,
+      },
+    ];
+
+    it('should return all token purchases', async () => {
+      mockTokenPurchaseService.getAllTokenPurchases.mockResolvedValue(
+        mockPurchases,
+      );
+
+      const result = await controller.getAllTokenPurchases();
+
+      expect(service.getAllTokenPurchases).toHaveBeenCalled();
+      expect(result).toEqual(mockPurchases);
+    });
+
+    it('should throw an HttpException when service throws an error', async () => {
+      const errorMessage = 'Database error';
+      mockTokenPurchaseService.getAllTokenPurchases.mockRejectedValue(
+        new Error(errorMessage),
+      );
+
+      try {
+        await controller.getAllTokenPurchases();
+        fail('Expected HttpException to be thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(HttpException);
+        expect(error.message).toBe(errorMessage);
+        expect(error.getStatus()).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+    });
+  });
+
   describe('getFulfilledTokenPurchases', () => {
     const mockFulfilledPurchases = [
       {
@@ -365,6 +458,273 @@ describe('TokenPurchaseController', () => {
 
       try {
         await controller.getPendingTokenPurchases();
+        fail('Expected HttpException to be thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(HttpException);
+        expect(error.message).toBe(errorMessage);
+        expect(error.getStatus()).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+    });
+  });
+
+  // Tests for fulfillment endpoints
+  describe('fulfillTokenPurchase', () => {
+    const id = '60d21b4667d0d8992e610c85';
+    const txHash =
+      '0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b';
+    const mockPurchase = {
+      _id: id,
+      walletAddress: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
+      amount: '1000000000000000000',
+      selectedPaymentToken: 'ETH',
+      paymentAmount: '0.5',
+      fulfilled: true,
+      txHash: txHash,
+    };
+
+    it('should fulfill a token purchase by ID', async () => {
+      mockTokenPurchaseService.fulfillTokenPurchase.mockResolvedValue(
+        mockPurchase,
+      );
+
+      const result = await controller.fulfillTokenPurchase(id, txHash);
+
+      expect(service.fulfillTokenPurchase).toHaveBeenCalledWith(id, txHash);
+      expect(result).toEqual(mockPurchase);
+    });
+
+    it('should throw an HttpException when service throws an error', async () => {
+      const errorMessage = 'Token purchase not found';
+      mockTokenPurchaseService.fulfillTokenPurchase.mockRejectedValue(
+        new Error(errorMessage),
+      );
+
+      try {
+        await controller.fulfillTokenPurchase(id, txHash);
+        fail('Expected HttpException to be thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(HttpException);
+        expect(error.message).toBe(errorMessage);
+        expect(error.getStatus()).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+    });
+  });
+
+  describe('fulfillTokenPurchaseByWalletAddress', () => {
+    const walletAddress = '0x742d35Cc6634C0532925a3b844Bc454e4438f44e';
+    const txHash =
+      '0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b';
+    const mockFulfilledPurchases = [
+      {
+        walletAddress: walletAddress,
+        amount: '1000000000000000000',
+        selectedPaymentToken: 'ETH',
+        paymentAmount: '0.5',
+        fulfilled: true,
+        txHash: txHash,
+      },
+      {
+        walletAddress: walletAddress,
+        amount: '2000000000000000000',
+        selectedPaymentToken: 'USDT',
+        paymentAmount: '100',
+        fulfilled: true,
+        txHash: txHash,
+      },
+    ];
+
+    it('should fulfill purchases for a wallet address', async () => {
+      mockTokenPurchaseService.fulfillTokenPurchaseByWalletAddress.mockResolvedValue(
+        mockFulfilledPurchases,
+      );
+
+      const result = await controller.fulfillTokenPurchaseByWalletAddress(
+        walletAddress,
+        txHash,
+      );
+
+      expect(service.fulfillTokenPurchaseByWalletAddress).toHaveBeenCalledWith(
+        walletAddress,
+        txHash,
+      );
+      expect(result).toEqual(mockFulfilledPurchases);
+    });
+
+    it('should handle empty results', async () => {
+      mockTokenPurchaseService.fulfillTokenPurchaseByWalletAddress.mockResolvedValue(
+        [],
+      );
+
+      const result = await controller.fulfillTokenPurchaseByWalletAddress(
+        walletAddress,
+        txHash,
+      );
+
+      expect(service.fulfillTokenPurchaseByWalletAddress).toHaveBeenCalledWith(
+        walletAddress,
+        txHash,
+      );
+      expect(result).toEqual([]);
+    });
+
+    it('should throw an HttpException when service throws an error', async () => {
+      const errorMessage = 'Service error';
+      mockTokenPurchaseService.fulfillTokenPurchaseByWalletAddress.mockRejectedValue(
+        new Error(errorMessage),
+      );
+
+      try {
+        await controller.fulfillTokenPurchaseByWalletAddress(
+          walletAddress,
+          txHash,
+        );
+        fail('Expected HttpException to be thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(HttpException);
+        expect(error.message).toBe(errorMessage);
+        expect(error.getStatus()).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+    });
+  });
+
+  describe('fulfillTokenPurchasesByIds', () => {
+    const ids = ['60d21b4667d0d8992e610c85', '60d21b4667d0d8992e610c86'];
+    const txHash =
+      '0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b';
+    const fulfillByIdsDto = { ids, txHash };
+    const mockFulfilledPurchases = [
+      {
+        _id: ids[0],
+        walletAddress: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
+        amount: '1000000000000000000',
+        selectedPaymentToken: 'ETH',
+        paymentAmount: '0.5',
+        fulfilled: true,
+        txHash: txHash,
+      },
+      {
+        _id: ids[1],
+        walletAddress: '0x123abc456def789',
+        amount: '2000000000000000000',
+        selectedPaymentToken: 'USDT',
+        paymentAmount: '100',
+        fulfilled: true,
+        txHash: txHash,
+      },
+    ];
+
+    it('should fulfill purchases by their IDs', async () => {
+      mockTokenPurchaseService.fulfillTokenPurchasesByIds.mockResolvedValue(
+        mockFulfilledPurchases,
+      );
+
+      const result =
+        await controller.fulfillTokenPurchasesByIds(fulfillByIdsDto);
+
+      expect(service.fulfillTokenPurchasesByIds).toHaveBeenCalledWith(
+        ids,
+        txHash,
+      );
+      expect(result).toEqual(mockFulfilledPurchases);
+    });
+
+    it('should handle empty results', async () => {
+      mockTokenPurchaseService.fulfillTokenPurchasesByIds.mockResolvedValue([]);
+
+      const result =
+        await controller.fulfillTokenPurchasesByIds(fulfillByIdsDto);
+
+      expect(service.fulfillTokenPurchasesByIds).toHaveBeenCalledWith(
+        ids,
+        txHash,
+      );
+      expect(result).toEqual([]);
+    });
+
+    it('should throw an HttpException when service throws an error', async () => {
+      const errorMessage = 'Service error';
+      mockTokenPurchaseService.fulfillTokenPurchasesByIds.mockRejectedValue(
+        new Error(errorMessage),
+      );
+
+      try {
+        await controller.fulfillTokenPurchasesByIds(fulfillByIdsDto);
+        fail('Expected HttpException to be thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(HttpException);
+        expect(error.message).toBe(errorMessage);
+        expect(error.getStatus()).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+    });
+  });
+
+  describe('fulfillTokenPurchasesByWalletAddresses', () => {
+    const walletAddresses = [
+      '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
+      '0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2',
+    ];
+    const txHash =
+      '0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b';
+    const fulfillByWalletAddressesDto = { walletAddresses, txHash };
+    const mockFulfilledPurchases = [
+      {
+        walletAddress: walletAddresses[0],
+        amount: '1000000000000000000',
+        selectedPaymentToken: 'ETH',
+        paymentAmount: '0.5',
+        fulfilled: true,
+        txHash: txHash,
+      },
+      {
+        walletAddress: walletAddresses[1],
+        amount: '2000000000000000000',
+        selectedPaymentToken: 'USDT',
+        paymentAmount: '100',
+        fulfilled: true,
+        txHash: txHash,
+      },
+    ];
+
+    it('should fulfill purchases for multiple wallet addresses', async () => {
+      mockTokenPurchaseService.fulfillTokenPurchasesByWalletAddresses.mockResolvedValue(
+        mockFulfilledPurchases,
+      );
+
+      const result = await controller.fulfillTokenPurchasesByWalletAddresses(
+        fulfillByWalletAddressesDto,
+      );
+
+      expect(
+        service.fulfillTokenPurchasesByWalletAddresses,
+      ).toHaveBeenCalledWith(walletAddresses, txHash);
+      expect(result).toEqual(mockFulfilledPurchases);
+    });
+
+    it('should handle empty results', async () => {
+      mockTokenPurchaseService.fulfillTokenPurchasesByWalletAddresses.mockResolvedValue(
+        [],
+      );
+
+      const result = await controller.fulfillTokenPurchasesByWalletAddresses(
+        fulfillByWalletAddressesDto,
+      );
+
+      expect(
+        service.fulfillTokenPurchasesByWalletAddresses,
+      ).toHaveBeenCalledWith(walletAddresses, txHash);
+      expect(result).toEqual([]);
+    });
+
+    it('should throw an HttpException when service throws an error', async () => {
+      const errorMessage = 'Service error';
+      mockTokenPurchaseService.fulfillTokenPurchasesByWalletAddresses.mockRejectedValue(
+        new Error(errorMessage),
+      );
+
+      try {
+        await controller.fulfillTokenPurchasesByWalletAddresses(
+          fulfillByWalletAddressesDto,
+        );
         fail('Expected HttpException to be thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(HttpException);

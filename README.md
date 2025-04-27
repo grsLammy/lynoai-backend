@@ -204,12 +204,56 @@ http://localhost:3001/api
 
 ## Token Purchase Endpoints
 
-| Method | Endpoint                    | Description                         |
-| ------ | --------------------------- | ----------------------------------- |
-| POST   | /token-purchase             | Create a new token purchase request |
-| GET    | /token-purchase             | Get all token purchases             |
-| GET    | /token-purchase/:id         | Get a token purchase by ID          |
-| PUT    | /token-purchase/:id/fulfill | Mark a token purchase as fulfilled  |
+| Method | Endpoint                                      | Description                                      |
+| ------ | --------------------------------------------- | ------------------------------------------------ |
+| POST   | /token-purchase                               | Create a new token purchase request              |
+| GET    | /token-purchase                               | Get all token purchases                          |
+| GET    | /token-purchase/:id                           | Get a token purchase by ID                       |
+| GET    | /token-purchase/wallet/:walletAddress         | Get token purchases by wallet address            |
+| GET    | /token-purchase/fulfilled                     | Get all fulfilled token purchases                |
+| GET    | /token-purchase/pending                       | Get all pending token purchases                  |
+| PUT    | /token-purchase/:id/fulfill                   | Mark a token purchase as fulfilled               |
+| PUT    | /token-purchase/fulfill/wallet/:walletAddress | Fulfill all token purchases for a wallet address |
+| PUT    | /token-purchase/fulfill/batch/ids             | Fulfill multiple token purchases by IDs          |
+| PUT    | /token-purchase/fulfill/batch/wallets         | Fulfill token purchases for multiple wallets     |
+
+### Token Purchase Request (POST /token-purchase)
+
+Create a new token purchase request with the following parameters:
+
+```json
+{
+  "walletAddress": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+  "amount": "1000000000000000000", // Amount in wei
+  "selectedPaymentToken": "ETH", // ETH, USDT, or USDC
+  "paymentAmount": "0.5" // Amount in the payment token
+}
+```
+
+### Batch Fulfillment by IDs (PUT /token-purchase/fulfill/batch/ids)
+
+Fulfill multiple token purchases by their IDs:
+
+```json
+{
+  "ids": ["60d21b4667d0d8992e610c85", "60d21b4667d0d8992e610c86"],
+  "txHash": "0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b"
+}
+```
+
+### Batch Fulfillment by Wallet Addresses (PUT /token-purchase/fulfill/batch/wallets)
+
+Fulfill all pending token purchases for multiple wallet addresses:
+
+```json
+{
+  "walletAddresses": [
+    "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+    "0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2"
+  ],
+  "txHash": "0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b"
+}
+```
 
 ## License
 

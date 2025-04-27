@@ -10,7 +10,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import { TokenPurchaseService } from './token-purchase.service';
-import { PurchaseTokenDto } from './dto';
+import {
+  PurchaseTokenDto,
+  FulfillByWalletAddressDto,
+  FulfillByIdsDto,
+  FulfillByWalletAddressesDto,
+} from './dto';
 import {
   ApiBody,
   ApiOperation,
@@ -313,6 +318,168 @@ export class TokenPurchaseController {
     } catch (error) {
       this.logger.error(
         `Error in fulfillTokenPurchase controller: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new HttpException(
+        error instanceof Error ? error.message : 'Internal Server Error',
+        error instanceof HttpException
+          ? error.getStatus()
+          : HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Fulfill all pending token purchases for a specific wallet address
+   * @param walletAddress Ethereum wallet address
+   * @param fulfillByWalletAddressDto Data containing txHash
+   * @returns Array of updated token purchases
+   */
+  @Put('fulfill/wallet/:walletAddress')
+  @ApiOperation({
+    summary: 'Fulfill all token purchases for a wallet',
+    description:
+      'Mark all pending token purchases for a wallet as fulfilled with a transaction hash',
+  })
+  @ApiParam({
+    name: 'walletAddress',
+    description: 'Ethereum wallet address',
+    example: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
+  })
+  @ApiBody({
+    type: FulfillByWalletAddressDto,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Token purchases fulfilled successfully',
+  })
+  async fulfillTokenPurchaseByWalletAddress(
+    @Param('walletAddress') walletAddress: string,
+    @Body('txHash') txHash: string,
+  ) {
+    try {
+      this.logger.log(
+        `Fulfilling token purchases for wallet: ${walletAddress} with txHash: ${txHash}`,
+      );
+      return await this.tokenPurchaseService.fulfillTokenPurchaseByWalletAddress(
+        walletAddress,
+        txHash,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error in fulfillTokenPurchaseByWalletAddress controller: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new HttpException(
+        error instanceof Error ? error.message : 'Internal Server Error',
+        error instanceof HttpException
+          ? error.getStatus()
+          : HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Fulfill multiple token purchases by their IDs
+   * @param fulfillByIdsDto Data containing IDs and txHash
+   * @returns Array of updated token purchases
+   */
+  @Put('fulfill/batch/ids')
+  @ApiOperation({
+    summary: 'Fulfill multiple token purchases by IDs',
+    description: 'Mark multiple token purchases as fulfilled using their IDs',
+  })
+  @ApiBody({
+    type: FulfillByIdsDto,
+    description:
+      'Array of token purchase IDs to fulfill and the transaction hash',
+    examples: {
+      example1: {
+        value: {
+          ids: ['60d21b4667d0d8992e610c85', '60d21b4667d0d8992e610c86'],
+          txHash:
+            '0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Token purchases fulfilled successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'One or more token purchases not found',
+  })
+  async fulfillTokenPurchasesByIds(@Body() fulfillByIdsDto: FulfillByIdsDto) {
+    try {
+      this.logger.log(
+        `Fulfilling batch token purchases with IDs: ${fulfillByIdsDto.ids.join(', ')}`,
+      );
+      return await this.tokenPurchaseService.fulfillTokenPurchasesByIds(
+        fulfillByIdsDto.ids,
+        fulfillByIdsDto.txHash,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error in fulfillTokenPurchasesByIds controller: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new HttpException(
+        error instanceof Error ? error.message : 'Internal Server Error',
+        error instanceof HttpException
+          ? error.getStatus()
+          : HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Fulfill all pending token purchases for multiple wallet addresses
+   * @param fulfillByWalletAddressesDto Data containing wallet addresses and txHash
+   * @returns Array of updated token purchases
+   */
+  @Put('fulfill/batch/wallets')
+  @ApiOperation({
+    summary: 'Fulfill token purchases for multiple wallets',
+    description:
+      'Mark all pending token purchases for multiple wallets as fulfilled',
+  })
+  @ApiBody({
+    type: FulfillByWalletAddressesDto,
+    description:
+      'Array of wallet addresses to fulfill purchases for and the transaction hash',
+    examples: {
+      example1: {
+        value: {
+          walletAddresses: [
+            '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
+            '0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2',
+          ],
+          txHash:
+            '0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Token purchases fulfilled successfully',
+  })
+  async fulfillTokenPurchasesByWalletAddresses(
+    @Body() fulfillByWalletAddressesDto: FulfillByWalletAddressesDto,
+  ) {
+    try {
+      this.logger.log(
+        `Fulfilling token purchases for multiple wallets: ${fulfillByWalletAddressesDto.walletAddresses.join(', ')}`,
+      );
+      return await this.tokenPurchaseService.fulfillTokenPurchasesByWalletAddresses(
+        fulfillByWalletAddressesDto.walletAddresses,
+        fulfillByWalletAddressesDto.txHash,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error in fulfillTokenPurchasesByWalletAddresses controller: ${error instanceof Error ? error.message : String(error)}`,
         error instanceof Error ? error.stack : undefined,
       );
       throw new HttpException(
