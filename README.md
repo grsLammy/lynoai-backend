@@ -225,10 +225,10 @@ Create a new token purchase request with the following parameters:
 ```json
 {
   "walletAddress": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
-  "amount": "1000000000000000000", // Amount in wei
-  "selectedPaymentToken": "ETH", // ETH, USDT, or USDC
-  "paymentAmount": "0.5", // Amount in the payment token
-  "paymentTxHash": "0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b" // Transaction hash of the payment
+  "amount": "1000000000000000000",
+  "selectedPaymentToken": "ETH",
+  "paymentAmount": "0.5",
+  "paymentTxHash": "0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b"
 }
 ```
 
