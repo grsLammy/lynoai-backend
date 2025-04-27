@@ -37,6 +37,7 @@ export class TokenPurchaseService {
       amount: purchaseTokenDto.amount,
       selectedPaymentToken: purchaseTokenDto.selectedPaymentToken,
       paymentAmount: purchaseTokenDto.paymentAmount,
+      paymentTxHash: purchaseTokenDto.paymentTxHash,
       fulfilled: false,
     });
 

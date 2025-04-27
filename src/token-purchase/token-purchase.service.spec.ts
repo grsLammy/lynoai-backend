@@ -34,6 +34,8 @@ describe('TokenPurchaseService', () => {
     amount: '1000000000000000000',
     selectedPaymentToken: 'ETH' as PaymentTokenType,
     paymentAmount: '0.5',
+    paymentTxHash:
+      '0x3f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94a',
     fulfilled: false,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -44,6 +46,8 @@ describe('TokenPurchaseService', () => {
     amount: '1000000000000000000',
     selectedPaymentToken: 'ETH' as PaymentTokenType,
     paymentAmount: '0.5',
+    paymentTxHash:
+      '0x3f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94a',
   };
 
   beforeEach(async () => {

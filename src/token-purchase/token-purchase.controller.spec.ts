@@ -84,6 +84,8 @@ describe('TokenPurchaseController', () => {
       amount: '1000000000000000000',
       selectedPaymentToken: 'ETH',
       paymentAmount: '100',
+      paymentTxHash:
+        '0x3f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94a',
     };
 
     // For MongoDB structure - using wallet address as the identifier
@@ -98,6 +100,8 @@ describe('TokenPurchaseController', () => {
       amount: '1000000000000000000',
       selectedPaymentToken: 'ETH',
       paymentAmount: '100',
+      paymentTxHash:
+        '0x3f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94a',
       fulfilled: false,
     };
 
@@ -160,6 +164,8 @@ describe('TokenPurchaseController', () => {
         amount: '1000000000000000000',
         selectedPaymentToken: 'USDT',
         paymentAmount: '100',
+        paymentTxHash:
+          '0x3f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94a',
       };
 
       const usdtMockResponse = {
@@ -167,6 +173,8 @@ describe('TokenPurchaseController', () => {
         amount: '1000000000000000000',
         selectedPaymentToken: 'USDT',
         paymentAmount: '100',
+        paymentTxHash:
+          '0x3f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94a',
         fulfilled: false,
       };
 
@@ -188,6 +196,8 @@ describe('TokenPurchaseController', () => {
         amount: '1000000000000000000',
         selectedPaymentToken: 'USDC',
         paymentAmount: '100',
+        paymentTxHash:
+          '0x3f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94a',
       };
 
       const usdcMockResponse = {
@@ -195,6 +205,8 @@ describe('TokenPurchaseController', () => {
         amount: '1000000000000000000',
         selectedPaymentToken: 'USDC',
         paymentAmount: '100',
+        paymentTxHash:
+          '0x3f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94a',
         fulfilled: false,
       };
 

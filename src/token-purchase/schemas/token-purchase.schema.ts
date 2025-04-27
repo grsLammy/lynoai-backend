@@ -44,6 +44,12 @@ export class TokenPurchase {
   paymentAmount: string;
 
   /**
+   * Transaction hash of the payment transaction
+   */
+  @Prop({ required: true })
+  paymentTxHash: string;
+
+  /**
    * Flag indicating if the token purchase has been fulfilled
    */
   @Prop({ default: false })

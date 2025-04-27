@@ -40,4 +40,13 @@ export class PurchaseTokenDto {
   @IsString()
   @IsNotEmpty()
   paymentAmount: string;
+
+  @ApiProperty({
+    description: 'Transaction hash of the payment transaction',
+    example:
+      '0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b',
+  })
+  @IsString()
+  @IsNotEmpty()
+  paymentTxHash: string;
 }
