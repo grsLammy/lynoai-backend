@@ -292,4 +292,62 @@ export class TokenPurchaseService {
     );
     return updatedPurchases;
   }
+
+  /**
+   * Fulfill all pending token purchases with a single transaction hash
+   * @param txHash Transaction hash from the blockchain
+   * @returns Array of updated token purchases
+   */
+  async fulfillAllPendingTokenPurchases(
+    txHash: string,
+  ): Promise<TokenPurchaseDocument[]> {
+    this.logger.log(
+      `Fulfilling all pending token purchases with transaction hash: ${txHash}`,
+    );
+
+    // Get all pending token purchases
+    const pendingPurchases = await this.getPendingTokenPurchases();
+
+    if (!pendingPurchases.length) {
+      this.logger.warn('No pending token purchases found to fulfill');
+      return [];
+    }
+
+    // Update all pending purchases
+    const updatedPurchases = await Promise.all(
+      pendingPurchases.map(async (purchase) => {
+        purchase.fulfilled = true;
+        purchase.txHash = txHash;
+        return purchase.save();
+      }),
+    );
+
+    this.logger.log(
+      `Successfully fulfilled ${updatedPurchases.length} token purchases`,
+    );
+
+    // Group results by wallet address for logging
+    const walletCounts: Record<string, number> = updatedPurchases.reduce(
+      (acc: Record<string, number>, purchase) => {
+        const wallet = purchase.walletAddress;
+        acc[wallet] = (acc[wallet] || 0) + 1;
+        return acc;
+      },
+      {},
+    );
+
+    for (const [wallet, count] of Object.entries(walletCounts)) {
+      this.logger.log(
+        `Fulfilled ${count} purchases for wallet: ${String(wallet)}`,
+      );
+    }
+
+    this.logger.log(
+      `Successfully fulfilled ${updatedPurchases.length} token purchases across ${
+        Object.keys(walletCounts).length
+      } wallets`,
+    );
+
+    return updatedPurchases;
+  }
 }

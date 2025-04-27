@@ -68,3 +68,10 @@ export class FulfillByWalletAddressesDto extends FulfillTokenPurchaseDto {
   @IsNotEmpty({ each: true })
   walletAddresses: string[];
 }
+
+/**
+ * DTO for fulfilling all pending token purchases
+ */
+export class FulfillAllPendingDto extends FulfillTokenPurchaseDto {
+  // Only requires txHash which is inherited from FulfillTokenPurchaseDto
+}

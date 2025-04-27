@@ -4,8 +4,15 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TokenPurchaseController } from './token-purchase.controller';
 import { TokenPurchaseService } from './token-purchase.service';
 import { PurchaseTokenDto } from './dto';
-import { HttpException, HttpStatus, Logger } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Request } from 'express';
+import { PaymentTokenType } from './schemas/token-purchase.schema';
+import { FulfillAllPendingDto } from './dto';
 
 // Define a simple interface for our tests - using wallet address instead of email/JWT
 interface UserInfo {
@@ -32,6 +39,7 @@ describe('TokenPurchaseController', () => {
     fulfillTokenPurchaseByWalletAddress: jest.fn(),
     fulfillTokenPurchasesByIds: jest.fn(),
     fulfillTokenPurchasesByWalletAddresses: jest.fn(),
+    fulfillAllPendingTokenPurchases: jest.fn(),
   };
 
   // Mock Logger to avoid console output during tests
@@ -731,6 +739,86 @@ describe('TokenPurchaseController', () => {
         expect(error.message).toBe(errorMessage);
         expect(error.getStatus()).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
       }
+    });
+  });
+
+  describe('fulfillAllPendingTokenPurchases', () => {
+    const mockFulfillAllPendingDto: FulfillAllPendingDto = {
+      txHash:
+        '0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b',
+    };
+
+    it('should fulfill all pending token purchases', async () => {
+      // Create fulfilled mock purchases
+      const mockFulfilledPurchase1 = {
+        _id: '60d21b4667d0d8992e610c85',
+        walletAddress: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
+        amount: '1000000000000000000',
+        selectedPaymentToken: 'ETH' as PaymentTokenType,
+        paymentAmount: '0.5',
+        fulfilled: true,
+        txHash: mockFulfillAllPendingDto.txHash,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const mockFulfilledPurchase2 = {
+        _id: '60d21b4667d0d8992e610c86',
+        walletAddress: '0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2',
+        amount: '2000000000000000000',
+        selectedPaymentToken: 'USDT' as PaymentTokenType,
+        paymentAmount: '100',
+        fulfilled: true,
+        txHash: mockFulfillAllPendingDto.txHash,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      // Set up the mock service to return the expected result
+      mockTokenPurchaseService.fulfillAllPendingTokenPurchases.mockResolvedValue(
+        [mockFulfilledPurchase1, mockFulfilledPurchase2],
+      );
+
+      // Call the controller method
+      const result = await controller.fulfillAllPendingTokenPurchases(
+        mockFulfillAllPendingDto,
+      );
+
+      // Assertions
+      expect(service.fulfillAllPendingTokenPurchases).toHaveBeenCalledWith(
+        mockFulfillAllPendingDto.txHash,
+      );
+      expect(result).toEqual([mockFulfilledPurchase1, mockFulfilledPurchase2]);
+    });
+
+    it('should handle errors gracefully', async () => {
+      // Set up the mock service to throw an error
+      mockTokenPurchaseService.fulfillAllPendingTokenPurchases.mockRejectedValue(
+        new Error('Test error'),
+      );
+
+      // Call the controller method and expect it to throw HttpException
+      await expect(
+        controller.fulfillAllPendingTokenPurchases(mockFulfillAllPendingDto),
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('should return empty array when no pending purchases exist', async () => {
+      // Set up the mock service to return an empty array
+      mockTokenPurchaseService.fulfillAllPendingTokenPurchases.mockResolvedValue(
+        [],
+      );
+
+      // Call the controller method
+      const result = await controller.fulfillAllPendingTokenPurchases(
+        mockFulfillAllPendingDto,
+      );
+
+      // Assertions
+      expect(service.fulfillAllPendingTokenPurchases).toHaveBeenCalledWith(
+        mockFulfillAllPendingDto.txHash,
+      );
+      expect(result).toEqual([]);
     });
   });
 });

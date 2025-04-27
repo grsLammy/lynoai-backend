@@ -359,4 +359,63 @@ describe('TokenPurchaseService', () => {
       expect(MockModel.find).toHaveBeenCalledWith({ fulfilled: false });
     });
   });
+
+  describe('fulfillAllPendingTokenPurchases', () => {
+    const txHash =
+      '0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b';
+
+    it('should fulfill all pending token purchases', async () => {
+      // Create mock pending purchases
+      const mockPurchase1 = {
+        ...mockTokenPurchase,
+        _id: '60d21b4667d0d8992e610c85',
+        walletAddress: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
+        fulfilled: false,
+        save: jest.fn().mockImplementation(function () {
+          this.fulfilled = true;
+          this.txHash = txHash;
+          return this;
+        }),
+      } as unknown as TokenPurchaseDocument;
+
+      const mockPurchase2 = {
+        ...mockTokenPurchase,
+        _id: '60d21b4667d0d8992e610c86',
+        walletAddress: '0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2',
+        fulfilled: false,
+        save: jest.fn().mockImplementation(function () {
+          this.fulfilled = true;
+          this.txHash = txHash;
+          return this;
+        }),
+      } as unknown as TokenPurchaseDocument;
+
+      // Mock the getPendingTokenPurchases method
+      jest
+        .spyOn(service, 'getPendingTokenPurchases')
+        .mockResolvedValue([mockPurchase1, mockPurchase2]);
+
+      const result = await service.fulfillAllPendingTokenPurchases(txHash);
+
+      expect(service.getPendingTokenPurchases).toHaveBeenCalled();
+      expect(mockPurchase1.save).toHaveBeenCalled();
+      expect(mockPurchase2.save).toHaveBeenCalled();
+
+      expect(result.length).toBe(2);
+      expect(result[0].fulfilled).toBe(true);
+      expect(result[0].txHash).toBe(txHash);
+      expect(result[1].fulfilled).toBe(true);
+      expect(result[1].txHash).toBe(txHash);
+    });
+
+    it('should return empty array when no pending purchases exist', async () => {
+      // Mock getPendingTokenPurchases to return empty array
+      jest.spyOn(service, 'getPendingTokenPurchases').mockResolvedValue([]);
+
+      const result = await service.fulfillAllPendingTokenPurchases(txHash);
+
+      expect(service.getPendingTokenPurchases).toHaveBeenCalled();
+      expect(result).toEqual([]);
+    });
+  });
 });

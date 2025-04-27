@@ -15,6 +15,7 @@ import {
   FulfillByWalletAddressDto,
   FulfillByIdsDto,
   FulfillByWalletAddressesDto,
+  FulfillAllPendingDto,
 } from './dto';
 import {
   ApiBody,
@@ -480,6 +481,57 @@ export class TokenPurchaseController {
     } catch (error) {
       this.logger.error(
         `Error in fulfillTokenPurchasesByWalletAddresses controller: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new HttpException(
+        error instanceof Error ? error.message : 'Internal Server Error',
+        error instanceof HttpException
+          ? error.getStatus()
+          : HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Fulfill all pending token purchases with a single transaction
+   * @param fulfillAllPendingDto Data containing the transaction hash
+   * @returns Array of updated token purchases
+   */
+  @Put('fulfill/all-pending')
+  @ApiOperation({
+    summary: 'Fulfill all pending token purchases',
+    description:
+      'Mark all pending token purchases as fulfilled with a single transaction hash',
+  })
+  @ApiBody({
+    type: FulfillAllPendingDto,
+    description: 'Transaction hash for the blockchain transaction',
+    examples: {
+      example1: {
+        value: {
+          txHash:
+            '0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'All pending token purchases fulfilled successfully',
+  })
+  async fulfillAllPendingTokenPurchases(
+    @Body() fulfillAllPendingDto: FulfillAllPendingDto,
+  ) {
+    try {
+      this.logger.log(
+        `Fulfilling all pending token purchases with transaction hash: ${fulfillAllPendingDto.txHash}`,
+      );
+      return await this.tokenPurchaseService.fulfillAllPendingTokenPurchases(
+        fulfillAllPendingDto.txHash,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error in fulfillAllPendingTokenPurchases controller: ${error instanceof Error ? error.message : String(error)}`,
         error instanceof Error ? error.stack : undefined,
       );
       throw new HttpException(

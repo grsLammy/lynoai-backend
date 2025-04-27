@@ -216,6 +216,7 @@ http://localhost:3001/api
 | PUT    | /token-purchase/fulfill/wallet/:walletAddress | Fulfill all token purchases for a wallet address |
 | PUT    | /token-purchase/fulfill/batch/ids             | Fulfill multiple token purchases by IDs          |
 | PUT    | /token-purchase/fulfill/batch/wallets         | Fulfill token purchases for multiple wallets     |
+| PUT    | /token-purchase/fulfill/all-pending           | Fulfill all pending token purchases              |
 
 ### Token Purchase Request (POST /token-purchase)
 
@@ -254,6 +255,18 @@ Fulfill all pending token purchases for multiple wallet addresses:
   "txHash": "0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b"
 }
 ```
+
+### Fulfill All Pending Token Purchases (PUT /token-purchase/fulfill/all-pending)
+
+Fulfill all pending token purchases across all wallet addresses with a single transaction hash:
+
+```json
+{
+  "txHash": "0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b"
+}
+```
+
+This endpoint is particularly useful for batch processing of token distributions when you want to fulfill all pending purchases at once without specifying individual wallet addresses or token purchase IDs.
 
 ## License
 
