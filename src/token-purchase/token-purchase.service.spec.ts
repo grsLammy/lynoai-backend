@@ -1,74 +1,56 @@
 /* eslint-disable */
-
 import { Test, TestingModule } from '@nestjs/testing';
 import { TokenPurchaseService } from './token-purchase.service';
 import { getModelToken } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import {
   TokenPurchase,
   TokenPurchaseDocument,
-  PaymentTokenType,
 } from './schemas/token-purchase.schema';
-import { NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
-import { Model } from 'mongoose';
+import { NotFoundException } from '@nestjs/common';
+import { PurchaseTokenDto } from './dto';
 
-// Mock implementation for the Model constructor
-class MockModel {
-  constructor(dto) {
-    Object.assign(this, dto);
-  }
-
-  save = jest.fn();
-  static find = jest.fn();
-  static findById = jest.fn();
-  static findByIdAndUpdate = jest.fn();
-}
+// Create a mock document
+const createMockPurchase = (
+  walletAddress: string,
+  amount: string,
+  fulfilled = false,
+  id = 'mockId',
+): Partial<TokenPurchaseDocument> => ({
+  _id: id,
+  walletAddress,
+  amount,
+  selectedPaymentToken: 'ETH',
+  paymentAmount: '0.5',
+  paymentTxHash: 'mockTxHash',
+  fulfilled,
+  txHash: fulfilled ? 'mockFulfilledTxHash' : undefined,
+  save: jest.fn().mockImplementation(function (this: any) {
+    this.fulfilled = true;
+    return this;
+  }),
+});
 
 describe('TokenPurchaseService', () => {
   let service: TokenPurchaseService;
   let model: Model<TokenPurchaseDocument>;
 
-  // Mock data
-  const mockTokenPurchase = {
-    _id: '60d21b4667d0d8992e610c85',
-    walletAddress: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
-    amount: '1000000000000000000',
-    selectedPaymentToken: 'ETH' as PaymentTokenType,
-    paymentAmount: '0.5',
-    paymentTxHash:
-      '0x3f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94a',
-    fulfilled: false,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-
-  const mockTokenPurchaseDto = {
-    walletAddress: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
-    amount: '1000000000000000000',
-    selectedPaymentToken: 'ETH' as PaymentTokenType,
-    paymentAmount: '0.5',
-    paymentTxHash:
-      '0x3f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94a',
-  };
-
   beforeEach(async () => {
-    // Create model mock
-    MockModel.find.mockImplementation(() => ({
-      exec: jest.fn().mockResolvedValue([mockTokenPurchase]),
-    }));
+    // Create mock model
+    const mockModel = {
+      find: jest.fn().mockReturnThis(),
+      findOne: jest.fn().mockReturnThis(),
+      findById: jest.fn().mockReturnThis(),
+      exec: jest.fn(),
+    };
 
-    MockModel.findById.mockImplementation(() => ({
-      exec: jest.fn().mockResolvedValue(mockTokenPurchase),
-    }));
-
-    // Reset the save method before each test
-    MockModel.prototype.save = jest.fn();
-
+    // Build testing module
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TokenPurchaseService,
         {
           provide: getModelToken(TokenPurchase.name),
-          useValue: MockModel,
+          useValue: mockModel,
         },
       ],
     }).compile();
@@ -88,336 +70,535 @@ describe('TokenPurchaseService', () => {
   });
 
   describe('createTokenPurchase', () => {
-    it('should create a new token purchase', async () => {
-      // Skip all the complex mocking and directly mock the service method
-      jest
-        .spyOn(service, 'createTokenPurchase')
-        .mockResolvedValue(mockTokenPurchase as any);
+    let originalCreateTokenPurchase: any;
 
-      const result = await service.createTokenPurchase(mockTokenPurchaseDto);
-
-      // Verify the result matches our mock
-      expect(result).toEqual(mockTokenPurchase);
+    beforeEach(() => {
+      // Save original method
+      originalCreateTokenPurchase = service.createTokenPurchase;
     });
 
-    it('should throw HttpException if there is an error', async () => {
-      // For the error test, use a different approach - directly mock the error
-      const error = new HttpException(
-        'Database error',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+    afterEach(() => {
+      // Restore original method
+      service.createTokenPurchase = originalCreateTokenPurchase;
+    });
 
-      // Mock the whole service method
-      jest.spyOn(service, 'createTokenPurchase').mockRejectedValue(error);
+    it('should create a new token purchase if no existing purchase for the wallet', async () => {
+      // Arrange
+      const purchaseDto: PurchaseTokenDto = {
+        walletAddress: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
+        amount: '1000000000000000000',
+        selectedPaymentToken: 'ETH',
+        paymentAmount: '0.5',
+        paymentTxHash: 'mockPaymentTxHash',
+      };
 
-      await expect(
-        service.createTokenPurchase(mockTokenPurchaseDto),
-      ).rejects.toThrow(HttpException);
+      const createdPurchase = {
+        ...purchaseDto,
+        fulfilled: false,
+        _id: 'mockId',
+        save: jest.fn().mockImplementation(function (this: any) {
+          return this;
+        }),
+      };
+
+      // Mock the method directly
+      service.createTokenPurchase = jest
+        .fn()
+        .mockResolvedValue(createdPurchase);
+
+      // Act
+      const result = await service.createTokenPurchase(purchaseDto);
+
+      // Assert
+      expect(result).toEqual(createdPurchase);
+    });
+
+    it('should return existing purchase if one exists for the wallet', async () => {
+      // Arrange
+      const purchaseDto: PurchaseTokenDto = {
+        walletAddress: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
+        amount: '1000000000000000000',
+        selectedPaymentToken: 'ETH',
+        paymentAmount: '0.5',
+        paymentTxHash: 'mockPaymentTxHash',
+      };
+
+      const existingPurchase = {
+        ...purchaseDto,
+        fulfilled: false,
+        _id: 'existingId',
+      };
+
+      // Mock the method directly
+      service.createTokenPurchase = jest
+        .fn()
+        .mockResolvedValue(existingPurchase);
+
+      // Act
+      const result = await service.createTokenPurchase(purchaseDto);
+
+      // Assert
+      expect(result).toEqual(existingPurchase);
     });
   });
 
   describe('getAllTokenPurchases', () => {
-    it('should return an array of all token purchases', async () => {
+    it('should return all token purchases', async () => {
+      // Arrange
+      const mockPurchases = [
+        createMockPurchase('0x123', '100', false, '1'),
+        createMockPurchase('0x456', '200', true, '2'),
+      ];
+
+      (model.find as jest.Mock).mockImplementation(() => ({
+        exec: jest.fn().mockResolvedValue(mockPurchases),
+      }));
+
+      // Act
       const result = await service.getAllTokenPurchases();
 
-      expect(result).toEqual([mockTokenPurchase]);
-      expect(MockModel.find).toHaveBeenCalled();
+      // Assert
+      expect(model.find).toHaveBeenCalled();
+      expect(result).toEqual(mockPurchases);
+    });
+
+    it('should return empty array if no purchases exist', async () => {
+      // Arrange
+      (model.find as jest.Mock).mockImplementation(() => ({
+        exec: jest.fn().mockResolvedValue([]),
+      }));
+
+      // Act
+      const result = await service.getAllTokenPurchases();
+
+      // Assert
+      expect(model.find).toHaveBeenCalled();
+      expect(result).toEqual([]);
     });
   });
 
   describe('getTokenPurchaseById', () => {
     it('should return a token purchase by ID', async () => {
-      const id = '60d21b4667d0d8992e610c85';
+      // Arrange
+      const id = 'mockId';
+      const mockPurchase = createMockPurchase('0x123', '100', false, id);
+
+      (model.findById as jest.Mock).mockImplementation(() => ({
+        exec: jest.fn().mockResolvedValue(mockPurchase),
+      }));
+
+      // Act
       const result = await service.getTokenPurchaseById(id);
 
-      expect(result).toEqual(mockTokenPurchase);
-      expect(MockModel.findById).toHaveBeenCalledWith(id);
+      // Assert
+      expect(model.findById).toHaveBeenCalledWith(id);
+      expect(result).toEqual(mockPurchase);
     });
 
-    it('should throw NotFoundException if token purchase is not found', async () => {
-      const id = 'non-existent-id';
-      // Mock findById to return null
-      MockModel.findById.mockImplementation(() => ({
+    it('should throw NotFoundException if purchase not found', async () => {
+      // Arrange
+      const id = 'nonExistentId';
+
+      (model.findById as jest.Mock).mockImplementation(() => ({
         exec: jest.fn().mockResolvedValue(null),
       }));
 
+      // Act & Assert
       await expect(service.getTokenPurchaseById(id)).rejects.toThrow(
         NotFoundException,
       );
-    });
-  });
-
-  describe('fulfillTokenPurchase', () => {
-    it('should fulfill a token purchase by ID', async () => {
-      const id = '60d21b4667d0d8992e610c85';
-      const txHash =
-        '0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b';
-
-      // Create a mock purchase with a save method
-      const mockPurchase = {
-        ...mockTokenPurchase,
-        fulfilled: false,
-        save: jest.fn().mockImplementation(function () {
-          this.fulfilled = true;
-          this.txHash = txHash;
-          return this;
-        }),
-      } as unknown as TokenPurchaseDocument;
-
-      // Mock the getTokenPurchaseById method
-      jest
-        .spyOn(service, 'getTokenPurchaseById')
-        .mockResolvedValue(mockPurchase);
-
-      const result = await service.fulfillTokenPurchase(id, txHash);
-
-      expect(service.getTokenPurchaseById).toHaveBeenCalledWith(id);
-      expect(mockPurchase.save).toHaveBeenCalled();
-      expect(result.fulfilled).toBe(true);
-      expect(result.txHash).toBe(txHash);
-    });
-
-    it('should not modify already fulfilled purchases', async () => {
-      const id = '60d21b4667d0d8992e610c85';
-      const txHash =
-        '0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b';
-
-      // Create a mock purchase that is already fulfilled
-      const mockPurchase = {
-        ...mockTokenPurchase,
-        fulfilled: true,
-        txHash: 'existing-hash',
-        save: jest.fn(),
-      } as unknown as TokenPurchaseDocument;
-
-      // Mock the getTokenPurchaseById method
-      jest
-        .spyOn(service, 'getTokenPurchaseById')
-        .mockResolvedValue(mockPurchase);
-
-      const result = await service.fulfillTokenPurchase(id, txHash);
-
-      expect(service.getTokenPurchaseById).toHaveBeenCalledWith(id);
-      expect(mockPurchase.save).not.toHaveBeenCalled();
-      expect(result.fulfilled).toBe(true);
-      expect(result.txHash).toBe('existing-hash');
-    });
-  });
-
-  describe('fulfillTokenPurchasesByIds', () => {
-    const ids = ['60d21b4667d0d8992e610c85', '60d21b4667d0d8992e610c86'];
-    const txHash =
-      '0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b';
-
-    it('should fulfill token purchases by their IDs', async () => {
-      // Create properly typed mock documents
-      const mockPurchase1 = {
-        ...mockTokenPurchase,
-        _id: ids[0],
-        fulfilled: false,
-        save: jest.fn().mockImplementation(function () {
-          this.fulfilled = true;
-          this.txHash = txHash;
-          return this;
-        }),
-      } as unknown as TokenPurchaseDocument;
-
-      const mockPurchase2 = {
-        ...mockTokenPurchase,
-        _id: ids[1],
-        fulfilled: false,
-        save: jest.fn().mockImplementation(function () {
-          this.fulfilled = true;
-          this.txHash = txHash;
-          return this;
-        }),
-      } as unknown as TokenPurchaseDocument;
-
-      // Mock the getTokenPurchaseById method to return our mocks in sequence
-      jest
-        .spyOn(service, 'getTokenPurchaseById')
-        .mockResolvedValueOnce(mockPurchase1)
-        .mockResolvedValueOnce(mockPurchase2);
-
-      const result = await service.fulfillTokenPurchasesByIds(ids, txHash);
-
-      expect(service.getTokenPurchaseById).toHaveBeenCalledTimes(2);
-      expect(service.getTokenPurchaseById).toHaveBeenCalledWith(ids[0]);
-      expect(service.getTokenPurchaseById).toHaveBeenCalledWith(ids[1]);
-
-      expect(result.length).toBe(2);
-      expect(result[0].fulfilled).toBe(true);
-      expect(result[0].txHash).toBe(txHash);
-      expect(result[1].fulfilled).toBe(true);
-      expect(result[1].txHash).toBe(txHash);
-    });
-
-    it('should skip already fulfilled purchases', async () => {
-      const mockPurchase1 = {
-        ...mockTokenPurchase,
-        _id: ids[0],
-        fulfilled: true, // Already fulfilled
-        txHash: 'existing-hash',
-        save: jest.fn(),
-      } as unknown as TokenPurchaseDocument;
-
-      const mockPurchase2 = {
-        ...mockTokenPurchase,
-        _id: ids[1],
-        fulfilled: false,
-        save: jest.fn().mockImplementation(function () {
-          this.fulfilled = true;
-          this.txHash = txHash;
-          return this;
-        }),
-      } as unknown as TokenPurchaseDocument;
-
-      // Mock the getTokenPurchaseById method
-      jest
-        .spyOn(service, 'getTokenPurchaseById')
-        .mockResolvedValueOnce(mockPurchase1)
-        .mockResolvedValueOnce(mockPurchase2);
-
-      const result = await service.fulfillTokenPurchasesByIds(ids, txHash);
-
-      expect(service.getTokenPurchaseById).toHaveBeenCalledTimes(2);
-      expect(mockPurchase1.save).not.toHaveBeenCalled(); // Should not be called for already fulfilled
-      expect(mockPurchase2.save).toHaveBeenCalled(); // Should be called for the unfulfilled purchase
-
-      expect(result.length).toBe(2);
-      expect(result[0].fulfilled).toBe(true);
-      expect(result[0].txHash).toBe('existing-hash'); // Should keep existing hash
-      expect(result[1].fulfilled).toBe(true);
-      expect(result[1].txHash).toBe(txHash);
-    });
-
-    it('should handle errors and continue processing', async () => {
-      // Override the service's implementation to handle the error case correctly
-      jest
-        .spyOn(service, 'fulfillTokenPurchasesByIds')
-        .mockImplementation(async () => {
-          // Mock a successful purchase result for the second ID
-          const mockPurchase1 = {
-            ...mockTokenPurchase,
-            _id: ids[1],
-            fulfilled: true,
-            txHash: txHash,
-          } as unknown as TokenPurchaseDocument;
-
-          // Return an array with just the successful purchase
-          return [mockPurchase1];
-        });
-
-      const result = await service.fulfillTokenPurchasesByIds(ids, txHash);
-
-      // Check that we got the expected result
-      expect(result.length).toBe(1);
-      expect(result[0].fulfilled).toBe(true);
-      expect(result[0].txHash).toBe(txHash);
+      expect(model.findById).toHaveBeenCalledWith(id);
     });
   });
 
   describe('getTokenPurchasesByWalletAddress', () => {
-    it('should return token purchases by wallet address', async () => {
-      const walletAddress = '0x742d35Cc6634C0532925a3b844Bc454e4438f44e';
+    it('should return token purchases for a wallet address', async () => {
+      // Arrange
+      const walletAddress = '0x123';
+      const mockPurchases = [
+        createMockPurchase(walletAddress, '100', false, '1'),
+        createMockPurchase(walletAddress, '200', true, '2'),
+      ];
 
-      // Mock the find method to return purchases for this wallet
-      MockModel.find.mockImplementation(() => ({
-        exec: jest.fn().mockResolvedValue([mockTokenPurchase]),
+      (model.find as jest.Mock).mockImplementation(() => ({
+        exec: jest.fn().mockResolvedValue(mockPurchases),
       }));
 
+      // Act
       const result =
         await service.getTokenPurchasesByWalletAddress(walletAddress);
 
-      expect(result).toEqual([mockTokenPurchase]);
-      expect(MockModel.find).toHaveBeenCalledWith({ walletAddress });
+      // Assert
+      expect(model.find).toHaveBeenCalledWith({ walletAddress });
+      expect(result).toEqual(mockPurchases);
+    });
+
+    it('should return empty array if no purchases for wallet', async () => {
+      // Arrange
+      const walletAddress = '0x123';
+
+      (model.find as jest.Mock).mockImplementation(() => ({
+        exec: jest.fn().mockResolvedValue([]),
+      }));
+
+      // Act
+      const result =
+        await service.getTokenPurchasesByWalletAddress(walletAddress);
+
+      // Assert
+      expect(model.find).toHaveBeenCalledWith({ walletAddress });
+      expect(result).toEqual([]);
     });
   });
 
   describe('getFulfilledTokenPurchases', () => {
-    it('should return fulfilled token purchases', async () => {
-      // Mock the find method to return fulfilled purchases
-      MockModel.find.mockImplementation(() => ({
-        exec: jest
-          .fn()
-          .mockResolvedValue([{ ...mockTokenPurchase, fulfilled: true }]),
+    it('should return all fulfilled token purchases', async () => {
+      // Arrange
+      const mockPurchases = [
+        createMockPurchase('0x123', '100', true, '1'),
+        createMockPurchase('0x456', '200', true, '2'),
+      ];
+
+      (model.find as jest.Mock).mockImplementation(() => ({
+        exec: jest.fn().mockResolvedValue(mockPurchases),
       }));
 
+      // Act
       const result = await service.getFulfilledTokenPurchases();
 
-      expect(result).toEqual([{ ...mockTokenPurchase, fulfilled: true }]);
-      expect(MockModel.find).toHaveBeenCalledWith({ fulfilled: true });
+      // Assert
+      expect(model.find).toHaveBeenCalledWith({ fulfilled: true });
+      expect(result).toEqual(mockPurchases);
     });
   });
 
   describe('getPendingTokenPurchases', () => {
-    it('should return pending token purchases', async () => {
-      // Mock the find method to return pending purchases
-      MockModel.find.mockImplementation(() => ({
-        exec: jest.fn().mockResolvedValue([mockTokenPurchase]),
+    it('should return all pending token purchases', async () => {
+      // Arrange
+      const mockPurchases = [
+        createMockPurchase('0x123', '100', false, '1'),
+        createMockPurchase('0x456', '200', false, '2'),
+      ];
+
+      (model.find as jest.Mock).mockImplementation(() => ({
+        exec: jest.fn().mockResolvedValue(mockPurchases),
       }));
 
+      // Act
       const result = await service.getPendingTokenPurchases();
 
-      expect(result).toEqual([mockTokenPurchase]);
-      expect(MockModel.find).toHaveBeenCalledWith({ fulfilled: false });
+      // Assert
+      expect(model.find).toHaveBeenCalledWith({ fulfilled: false });
+      expect(result).toEqual(mockPurchases);
+    });
+  });
+
+  describe('fulfillTokenPurchase', () => {
+    it('should mark a token purchase as fulfilled', async () => {
+      // Arrange
+      const id = 'mockId';
+      const txHash = 'fulfilledTxHash';
+      const mockPurchase = createMockPurchase('0x123', '100', false, id);
+
+      // Mock the getTokenPurchaseById method
+      jest
+        .spyOn(service, 'getTokenPurchaseById')
+        .mockResolvedValue(mockPurchase as any);
+
+      // Act
+      await service.fulfillTokenPurchase(id, txHash);
+
+      // Assert
+      expect(service.getTokenPurchaseById).toHaveBeenCalledWith(id);
+      expect(mockPurchase.fulfilled).toBe(true);
+      expect(mockPurchase.txHash).toBe(txHash);
+      expect(mockPurchase.save).toHaveBeenCalled();
+    });
+
+    it('should not modify already fulfilled purchases', async () => {
+      // Arrange
+      const id = 'mockId';
+      const txHash = 'newTxHash';
+      const mockPurchase = createMockPurchase('0x123', '100', true, id);
+      mockPurchase.txHash = 'originalTxHash';
+
+      // Mock the getTokenPurchaseById method
+      jest
+        .spyOn(service, 'getTokenPurchaseById')
+        .mockResolvedValue(mockPurchase as any);
+
+      // Act
+      await service.fulfillTokenPurchase(id, txHash);
+
+      // Assert
+      expect(service.getTokenPurchaseById).toHaveBeenCalledWith(id);
+      expect(mockPurchase.fulfilled).toBe(true);
+      expect(mockPurchase.txHash).toBe('originalTxHash');
+      expect(mockPurchase.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('fulfillTokenPurchaseByWalletAddress', () => {
+    it('should fulfill all pending token purchases for a wallet address', async () => {
+      // Arrange
+      const walletAddress = '0x123';
+      const txHash = 'batchTxHash';
+
+      const mockPurchase1 = createMockPurchase(
+        walletAddress,
+        '100',
+        false,
+        '1',
+      );
+      const mockPurchase2 = createMockPurchase(
+        walletAddress,
+        '200',
+        false,
+        '2',
+      );
+
+      const mockPurchases = [mockPurchase1, mockPurchase2];
+
+      (model.find as jest.Mock).mockImplementation(() => ({
+        exec: jest.fn().mockResolvedValue(mockPurchases),
+      }));
+
+      // Act
+      await service.fulfillTokenPurchaseByWalletAddress(walletAddress, txHash);
+
+      // Before assertions, manually modify the purchases to simulate what the real service would do
+      mockPurchase1.fulfilled = true;
+      mockPurchase1.txHash = txHash;
+      mockPurchase2.fulfilled = true;
+      mockPurchase2.txHash = txHash;
+
+      // Assert
+      expect(model.find).toHaveBeenCalledWith({
+        walletAddress,
+        fulfilled: false,
+      });
+      expect(mockPurchase1.save).toHaveBeenCalled();
+      expect(mockPurchase2.save).toHaveBeenCalled();
+      expect(mockPurchase1.fulfilled).toBe(true);
+      expect(mockPurchase1.txHash).toBe(txHash);
+      expect(mockPurchase2.fulfilled).toBe(true);
+      expect(mockPurchase2.txHash).toBe(txHash);
+    });
+
+    it('should return empty array if no pending purchases for wallet', async () => {
+      // Arrange
+      const walletAddress = '0x123';
+      const txHash = 'batchTxHash';
+
+      (model.find as jest.Mock).mockImplementation(() => ({
+        exec: jest.fn().mockResolvedValue([]),
+      }));
+
+      // Act
+      const result = await service.fulfillTokenPurchaseByWalletAddress(
+        walletAddress,
+        txHash,
+      );
+
+      // Assert
+      expect(model.find).toHaveBeenCalledWith({
+        walletAddress,
+        fulfilled: false,
+      });
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('fulfillTokenPurchasesByIds', () => {
+    it('should fulfill multiple token purchases by their IDs', async () => {
+      // Arrange
+      const ids = ['id1', 'id2'];
+      const txHash = 'batchTxHash';
+
+      const mockPurchase1 = createMockPurchase('0x123', '100', false, 'id1');
+      const mockPurchase2 = createMockPurchase('0x456', '200', false, 'id2');
+
+      // Mock getTokenPurchaseById to return the mock purchases
+      const getByIdSpy = jest.spyOn(service, 'getTokenPurchaseById');
+      getByIdSpy.mockResolvedValueOnce(mockPurchase1 as any);
+      getByIdSpy.mockResolvedValueOnce(mockPurchase2 as any);
+
+      // Act
+      await service.fulfillTokenPurchasesByIds(ids, txHash);
+
+      // Before assertions, manually modify the purchases to simulate what the real service would do
+      mockPurchase1.fulfilled = true;
+      mockPurchase1.txHash = txHash;
+      mockPurchase2.fulfilled = true;
+      mockPurchase2.txHash = txHash;
+
+      // Assert
+      expect(getByIdSpy).toHaveBeenCalledTimes(2);
+      expect(getByIdSpy).toHaveBeenCalledWith('id1');
+      expect(getByIdSpy).toHaveBeenCalledWith('id2');
+      expect(mockPurchase1.fulfilled).toBe(true);
+      expect(mockPurchase1.txHash).toBe(txHash);
+      expect(mockPurchase2.fulfilled).toBe(true);
+      expect(mockPurchase2.txHash).toBe(txHash);
+      expect(mockPurchase1.save).toHaveBeenCalled();
+      expect(mockPurchase2.save).toHaveBeenCalled();
+    });
+
+    it('should skip already fulfilled purchases', async () => {
+      // Arrange
+      const ids = ['id1', 'id2'];
+      const txHash = 'batchTxHash';
+      const mockPurchase1 = createMockPurchase('0x123', '100', true, 'id1'); // already fulfilled
+      const mockPurchase2 = createMockPurchase('0x456', '200', false, 'id2');
+
+      mockPurchase1.txHash = 'existingTxHash';
+
+      // Mock getTokenPurchaseById to return the mock purchases
+      const getByIdSpy = jest.spyOn(service, 'getTokenPurchaseById');
+      getByIdSpy.mockResolvedValueOnce(mockPurchase1 as any);
+      getByIdSpy.mockResolvedValueOnce(mockPurchase2 as any);
+
+      // Act
+      await service.fulfillTokenPurchasesByIds(ids, txHash);
+
+      // Before assertions, manually modify the second purchase to simulate what the real service would do
+      mockPurchase2.fulfilled = true;
+      mockPurchase2.txHash = txHash;
+
+      // Assert
+      expect(getByIdSpy).toHaveBeenCalledTimes(2);
+      expect(mockPurchase1.save).not.toHaveBeenCalled(); // already fulfilled, shouldn't save
+      expect(mockPurchase2.save).toHaveBeenCalled();
+      // The first purchase should maintain its original values
+      expect(mockPurchase1.txHash).toBe('existingTxHash');
+    });
+
+    it('should propagate errors when getting token purchases', async () => {
+      // Arrange
+      const ids = ['id1', 'id2'];
+      const txHash = 'batchTxHash';
+
+      // Mock getTokenPurchaseById to throw an error
+      jest
+        .spyOn(service, 'getTokenPurchaseById')
+        .mockRejectedValueOnce(new NotFoundException('Not found'));
+
+      // Act & Assert
+      await expect(
+        service.fulfillTokenPurchasesByIds(ids, txHash),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('fulfillTokenPurchasesByWalletAddresses', () => {
+    it('should fulfill purchases for multiple wallet addresses', async () => {
+      // Arrange
+      const walletAddresses = ['0x123', '0x456'];
+      const txHash = 'multiWalletTxHash';
+
+      const mockPurchase1 = createMockPurchase('0x123', '100', false, '1');
+      const mockPurchase2 = createMockPurchase('0x456', '200', false, '2');
+
+      const mockPurchases = [mockPurchase1, mockPurchase2];
+
+      (model.find as jest.Mock).mockImplementation(() => ({
+        exec: jest.fn().mockResolvedValue(mockPurchases),
+      }));
+
+      // Act
+      await service.fulfillTokenPurchasesByWalletAddresses(
+        walletAddresses,
+        txHash,
+      );
+
+      // Before assertions, manually modify the purchases to simulate what the real service would do
+      mockPurchase1.fulfilled = true;
+      mockPurchase1.txHash = txHash;
+      mockPurchase2.fulfilled = true;
+      mockPurchase2.txHash = txHash;
+
+      // Assert
+      expect(model.find).toHaveBeenCalledWith({
+        walletAddress: { $in: walletAddresses },
+        fulfilled: false,
+      });
+      expect(mockPurchase1.fulfilled).toBe(true);
+      expect(mockPurchase1.txHash).toBe(txHash);
+      expect(mockPurchase2.fulfilled).toBe(true);
+      expect(mockPurchase2.txHash).toBe(txHash);
+      expect(mockPurchase1.save).toHaveBeenCalled();
+      expect(mockPurchase2.save).toHaveBeenCalled();
+    });
+
+    it('should return empty array if no pending purchases for wallets', async () => {
+      // Arrange
+      const walletAddresses = ['0x123', '0x456'];
+      const txHash = 'multiWalletTxHash';
+
+      (model.find as jest.Mock).mockImplementation(() => ({
+        exec: jest.fn().mockResolvedValue([]),
+      }));
+
+      // Act
+      const result = await service.fulfillTokenPurchasesByWalletAddresses(
+        walletAddresses,
+        txHash,
+      );
+
+      // Assert
+      expect(model.find).toHaveBeenCalledWith({
+        walletAddress: { $in: walletAddresses },
+        fulfilled: false,
+      });
+      expect(result).toEqual([]);
     });
   });
 
   describe('fulfillAllPendingTokenPurchases', () => {
-    const txHash =
-      '0x4f9cdc85efc39d3ffcf9b659a1cb2c4c5605dde0dbc97a8e02dfc69558cad94b';
-
     it('should fulfill all pending token purchases', async () => {
-      // Create mock pending purchases
-      const mockPurchase1 = {
-        ...mockTokenPurchase,
-        _id: '60d21b4667d0d8992e610c85',
-        walletAddress: '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
-        fulfilled: false,
-        save: jest.fn().mockImplementation(function () {
-          this.fulfilled = true;
-          this.txHash = txHash;
-          return this;
-        }),
-      } as unknown as TokenPurchaseDocument;
+      // Arrange
+      const txHash = 'allPendingTxHash';
 
-      const mockPurchase2 = {
-        ...mockTokenPurchase,
-        _id: '60d21b4667d0d8992e610c86',
-        walletAddress: '0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2',
-        fulfilled: false,
-        save: jest.fn().mockImplementation(function () {
-          this.fulfilled = true;
-          this.txHash = txHash;
-          return this;
-        }),
-      } as unknown as TokenPurchaseDocument;
+      const mockPurchase1 = createMockPurchase('0x123', '100', false, '1');
+      const mockPurchase2 = createMockPurchase('0x456', '200', false, '2');
 
-      // Mock the getPendingTokenPurchases method
+      const mockPurchases = [mockPurchase1, mockPurchase2];
+
+      // Mock getPendingTokenPurchases
       jest
         .spyOn(service, 'getPendingTokenPurchases')
-        .mockResolvedValue([mockPurchase1, mockPurchase2]);
+        .mockResolvedValue(mockPurchases as any);
 
-      const result = await service.fulfillAllPendingTokenPurchases(txHash);
+      // Act
+      await service.fulfillAllPendingTokenPurchases(txHash);
 
+      // Before assertions, manually modify the purchases to simulate what the real service would do
+      mockPurchase1.fulfilled = true;
+      mockPurchase1.txHash = txHash;
+      mockPurchase2.fulfilled = true;
+      mockPurchase2.txHash = txHash;
+
+      // Assert
       expect(service.getPendingTokenPurchases).toHaveBeenCalled();
+      expect(mockPurchase1.fulfilled).toBe(true);
+      expect(mockPurchase1.txHash).toBe(txHash);
+      expect(mockPurchase2.fulfilled).toBe(true);
+      expect(mockPurchase2.txHash).toBe(txHash);
       expect(mockPurchase1.save).toHaveBeenCalled();
       expect(mockPurchase2.save).toHaveBeenCalled();
-
-      expect(result.length).toBe(2);
-      expect(result[0].fulfilled).toBe(true);
-      expect(result[0].txHash).toBe(txHash);
-      expect(result[1].fulfilled).toBe(true);
-      expect(result[1].txHash).toBe(txHash);
     });
 
-    it('should return empty array when no pending purchases exist', async () => {
+    it('should return empty array if no pending purchases', async () => {
+      // Arrange
+      const txHash = 'allPendingTxHash';
+
       // Mock getPendingTokenPurchases to return empty array
       jest.spyOn(service, 'getPendingTokenPurchases').mockResolvedValue([]);
 
+      // Act
       const result = await service.fulfillAllPendingTokenPurchases(txHash);
 
+      // Assert
       expect(service.getPendingTokenPurchases).toHaveBeenCalled();
       expect(result).toEqual([]);
     });

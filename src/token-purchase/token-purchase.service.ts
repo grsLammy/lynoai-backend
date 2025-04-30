@@ -32,6 +32,17 @@ export class TokenPurchaseService {
       `Creating token purchase for wallet ${purchaseTokenDto.walletAddress}`,
     );
 
+    const existingPurchase = await this.tokenPurchaseModel.findOne({
+      walletAddress: purchaseTokenDto.walletAddress,
+    });
+
+    if (existingPurchase) {
+      this.logger.warn(
+        `Token purchase already exists for wallet ${purchaseTokenDto.walletAddress}`,
+      );
+      return existingPurchase;
+    }
+
     const tokenPurchase = new this.tokenPurchaseModel({
       walletAddress: purchaseTokenDto.walletAddress,
       amount: purchaseTokenDto.amount,
